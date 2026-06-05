@@ -7,7 +7,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 # 目標收件人
-RECEIVER_EMAIL = "favoritec358@gmail.com, jimmychwchang@gmail.com"
+RECEIVER_EMAIL = "favoritec358@gmail.com"
 
 # 1. 一般民調機構清單
 general_orgs = [
