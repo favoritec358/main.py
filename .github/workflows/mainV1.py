@@ -7,7 +7,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 # 目標收件人
-RECEIVER_EMAIL ="favoritec358@gmail.com, jimmychwchang@gmail.com"
+RECEIVER_EMAILS = ["favoritec358@gmail.com", "jimmychwchang@gmail.com"]
 
 # 1. 一般民調機構清單
 general_orgs = [
@@ -24,15 +24,10 @@ cross_strait_orgs = [
 def is_within_48_hours(entry):
     """【時間鐵閘】嚴格檢查新聞發布時間是否在 48 小時之內"""
     try:
-        # Google News RSS 的時間格式通常為：Fri, 05 Jun 2026 06:17:00 GMT
-        # 轉換為帶有 UTC 時區的 datetime 物件
         pub_time = datetime.strptime(entry.published, "%a, %d %b %Y %H:%M:%S %Z").replace(tzinfo=timezone.utc)
         now_time = datetime.now(timezone.utc)
-        
-        # 判斷差距是否小於 48 小時
         return (now_time - pub_time) <= timedelta(hours=48)
     except Exception as e:
-        # 如果時間解析失敗，保守起見允許放行，但記錄錯誤
         print(f"時間解析異常: {e}")
         return True
 
@@ -43,7 +38,6 @@ def fetch_and_filter_general(query, org_list):
     results = []
     
     for entry in feed.entries:
-        # 1. 第一道鐵閘：時間必須在 48 小時內，否則直接淘汰
         if not is_within_48_hours(entry):
             continue
             
@@ -51,7 +45,6 @@ def fetch_and_filter_general(query, org_list):
         has_org = any(org.lower() in title_lower for org in org_list)
         has_poll = "民調" in title_lower or "poll" in title_lower
         
-        # 2. 第二道鐵閘：標題符合才放行
         if has_org and has_poll:
             results.append({
                 "title": entry.title,
@@ -67,7 +60,6 @@ def fetch_and_filter_cross_strait(query, org_list):
     results = []
     
     for entry in feed.entries:
-        # 1. 第一道鐵閘：時間必須在 48 小時內，否則直接淘汰
         if not is_within_48_hours(entry):
             continue
             
@@ -76,7 +68,6 @@ def fetch_and_filter_cross_strait(query, org_list):
         has_cross = "兩岸" in title_lower or "兩岸關係" in title_lower
         has_poll = "民調" in title_lower or "poll" in title_lower
         
-        # 2. 第二道鐵閘：標題符合才放行
         if has_org and has_cross and has_poll:
             results.append({
                 "title": entry.title,
@@ -96,7 +87,7 @@ def build_queries():
     return query_general, query_cross_strait
 
 def send_email(html_content):
-    """發送 Email"""
+    """發送 Email 給所有人 (100% 符合 RFC 5321 安全規格版)"""
     sender_email = os.environ.get("SENDER_EMAIL")
     sender_password = os.environ.get("SENDER_PASSWORD")
     
@@ -104,33 +95,38 @@ def send_email(html_content):
         print("❌ 錯誤：未設定 SENDER_EMAIL 或 SENDER_PASSWORD 環境變數")
         return
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"📊 每日民調與兩岸關係精選追蹤 ({datetime.now().strftime('%Y-%m-%d')})"
-    msg["From"] = sender_email
-    msg["To"] = RECEIVER_EMAIL
-
-    part = MIMEText(html_content, "html", "utf-8")
-    msg.attach(part)
-
     try:
+        print("正在與 Gmail 建立安全連線...")
         server = smtplib.SMTP("smtp.gmail.com", 587)
         server.starttls()
         server.login(sender_email, sender_password)
-        server.sendmail(sender_email, RECEIVER_EMAIL, msg.as_string())
+        
+        # 🎯 核心修正：對每個收件人「單獨」打包成合法的獨立信件發送
+        for receiver in RECEIVER_EMAILS:
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = f"📊 每日民調與兩岸關係精選追蹤 ({datetime.now().strftime('%Y-%m-%d')})"
+            msg["From"] = sender_email
+            msg["To"] = receiver  # 這邊傳入單一字串，絕對符合 RFC 5321 規範！
+
+            part = MIMEText(html_content, "html", "utf-8")
+            msg.attach(part)
+            
+            # 單獨發送給該收件人
+            server.sendmail(sender_email, [receiver], msg.as_string())
+            print(f"✅ 信件已成功遞交給收件人: {receiver}")
+            
         server.quit()
-        print("✅ Email 發送成功！")
+        print("✅ [最終回報] 所有人信件皆已處理完畢！")
     except Exception as e:
-        print(f"❌ Email 發送失敗: {e}")
+        print(f"❌ [最終回報] 郵件發送流程發生異常: {e}")
 
 def main():
     print("下人開始實施【時間重重過濾】防噪聲追蹤...")
     query_general, query_cross_strait = build_queries()
     
-    # 執行時間與標題雙重嚴格過濾
     general_news = fetch_and_filter_general(query_general, general_orgs)
     cross_strait_news = fetch_and_filter_cross_strait(query_cross_strait, cross_strait_orgs)
 
-    # 組裝 HTML 報告
     html_content = f"<h2>📊 每日民調與兩岸關係精確追蹤報告</h2>"
     html_content += f"<p>報告時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (已啟動48小時內時間鐵閘)</p><hr>"
     
