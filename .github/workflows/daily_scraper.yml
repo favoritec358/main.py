@@ -10,7 +10,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. 改回官方最穩定的 checkout 方式，它會自動處理好儲存庫名稱與路徑
     - name: 1. 取得程式碼
       uses: actions/checkout@v4
 
@@ -22,9 +21,19 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    # 2. 這裡強制指定在「根目錄」下執行 python 程式
+    # 新增這步：幫我們在黑底白字畫面上印出「到底有哪些檔案」，抓出它藏在哪裡
+    - name: 🔍 Debug 檢查檔案位置
+      run: |
+        echo "=== 目前所在的絕對路徑 ==="
+        pwd
+        echo "=== 目前目錄下的所有檔案 ==="
+        ls -R
+
     - name: 4. 執行爬蟲與寄信
+      # 強制讓這一命令在虛擬機的最頂層根目錄執行
+      working-directory: ${{ github.workspace }}
       env:
         SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
         SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
-      run: python ${{ github.workspace }}/main.py
+      # 直接用最單純的檔名，配合 working-directory，它就不可能再疊加三次路徑了
+      run: python main.py
