@@ -1,26 +1,20 @@
 name: Daily Poll News Scraper
 
 on:
-  schedule:
-    - cron: '0 23 * * *'
-  workflow_dispatch: # 這次保證按鈕在左邊專屬分頁一定看得到！
+  workflow_dispatch: # 只保留手動按鈕，方便我們 debug
 
 jobs:
-  run-scraper:
+  debug-files:
     runs-on: ubuntu-latest
     steps:
     - name: 1. 抓取專案
       uses: actions/checkout@v4
 
-    - name: 2. 準備 Python 環境
-      uses: actions/setup-python@v5
-
-    - name: 3. 安裝必備套件
-      run: pip install feedparser
-
-    - name: 4. 暴力鎖定路徑執行
-      env:
-        SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
-        SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
-      # 不管它在哪個夾子，用萬能字元強行搜出來執行，看它怎麼迷路！
-      run: python **/mainV1.py || python mainV1.py
+    - name: 🔍 照妖鏡：列出所有檔案（抓出你到底把 Python 檔藏哪了）
+      run: |
+        echo "=== 當前工作目錄 ==="
+        pwd
+        echo "=== 根目錄下的檔案清單 ==="
+        ls -la
+        echo "=== 全專案地毯式搜索所有 .py 檔案 ==="
+        find . -name "*.py"
