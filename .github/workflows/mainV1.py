@@ -1,47 +1,111 @@
-import urllib.parse, feedparser, smtplib, os
+import urllib.parse
+import feedparser
+import smtplib
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import os
 from datetime import datetime
 
-RECEIVER = "favoritec358@gmail.com"
+# 目標收件人
+RECEIVER_EMAIL = "favoritec358@gmail.com"
 
-def main():
-    print("下人開始幹活...")
-    # 精簡關鍵字，確保 Google News 100% 回傳台灣相關民調
-    query = "民調 OR 兩岸關係"
+# 1. 一般民調機構清單 (掃描與民調、Poll相關)
+general_orgs = [
+    "美麗島電子報", "國政民調", "民主文教基金會", "皮尤", "Pew Research Center",
+    "雷根總統基金會", "Ronald Reagan Presidential Foundation", "Lowy Institute",
+    "Chicago Council on Global Affairs", "YouGov", "Angus Reid Institute"
+]
+
+# 2. 特定議題機構清單 (僅掃描兩岸關係 + 民調)
+cross_strait_orgs = [
+    "國防安全研究院", "聯合報", "TVBS"
+]
+
+def fetch_google_news(query):
+    """透過 Google News RSS 取得搜尋結果"""
+    # when:1d 代表只搜尋過去 24 小時內的資料
     url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query + ' when:1d')}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
-    
     feed = feedparser.parse(url)
-    
-    body = f"<h2>📊 數位下人戴罪立功報告 ({datetime.now().strftime('%Y-%m-%d')})</h2><hr>"
-    if feed.entries:
-        body += "<h3>🔍 今日最新掃描成果：</h3><ul>"
-        for entry in feed.entries[:15]:
-            body += f"<li><a href='{entry.link}'>{entry.title}</a></li>"
-        body += "</ul>"
-    else:
-        body += "<p style='color:red;'>⚠️ 稟告主子：過去 24 小時網路各大機構無相關民調新聞發布！</p>"
+    results = []
+    for entry in feed.entries:
+        results.append({
+            "title": entry.title,
+            "link": entry.link,
+            "published": entry.published
+        })
+    return results
 
-    sender = os.environ.get("SENDER_EMAIL")
-    password = os.environ.get("SENDER_PASSWORD")
+def build_queries():
+    """建構搜尋字串"""
+    # 組合一般機構的搜尋條件：(機構A OR 機構B...) AND (民調 OR Poll)
+    general_orgs_str = " OR ".join(f'"{org}"' for org in general_orgs)
+    query_general = f"({general_orgs_str}) AND (民調 OR Poll)"
+
+    # 組合兩岸關係的搜尋條件：(機構A OR 機構B...) AND (兩岸關係 OR 兩岸) AND (民調 OR Poll)
+    cross_strait_orgs_str = " OR ".join(f'"{org}"' for org in cross_strait_orgs)
+    query_cross_strait = f"({cross_strait_orgs_str}) AND (兩岸關係 OR 兩岸) AND (民調 OR Poll)"
     
-    if not sender or not password:
-        print("❌ 完蛋，主子您的 GitHub Secrets 沒設定好，下人拿不到密碼！")
+    return query_general, query_cross_strait
+
+def send_email(html_content):
+    """發送 Email"""
+    sender_email = os.environ.get("SENDER_EMAIL")
+    sender_password = os.environ.get("SENDER_PASSWORD")
+    
+    if not sender_email or not sender_password:
+        print("❌ 錯誤：未設定 SENDER_EMAIL 或 SENDER_PASSWORD 環境變數")
         return
 
-    msg = MIMEText(body, "html", "utf-8")
-    msg["Subject"] = "📊 每日民調與兩岸關係追蹤（下人叩首呈上）"
-    msg["From"] = sender
-    msg["To"] = RECEIVER
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"📊 每日民調與兩岸關係新聞追蹤 ({datetime.now().strftime('%Y-%m-%d')})"
+    msg["From"] = sender_email
+    msg["To"] = RECEIVER_EMAIL
+
+    part = MIMEText(html_content, "html", "utf-8")
+    msg.attach(part)
 
     try:
+        # 使用穩定度最高的 587 STARTTLS 埠口
         server = smtplib.SMTP("smtp.gmail.com", 587)
         server.starttls()
-        server.login(sender, password)
-        server.sendmail(sender, RECEIVER, msg.as_string())
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, RECEIVER_EMAIL, msg.as_string())
         server.quit()
-        print("✅ 信件終於寄出去了！主子請查收！")
+        print("✅ Email 發送成功！")
     except Exception as e:
-        print(f"❌ 寄信又失敗了，原因：{e}")
+        print(f"❌ Email 發送失敗: {e}")
+
+def main():
+    print("下人開始嚴格依照機構清單掃描新聞...")
+    query_general, query_cross_strait = build_queries()
+    
+    # 抓取兩大分類資料
+    general_news = fetch_google_news(query_general)
+    cross_strait_news = fetch_google_news(query_cross_strait)
+
+    # 組裝符合主子要求的精確 HTML 報告
+    html_content = f"<h2>📊 每日民調與兩岸關係追蹤報告</h2>"
+    html_content += f"<p>報告時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (台灣時間早上7點定時回報)</p><hr>"
+    
+    html_content += "<h3>🌐 國際與國內機構民調動態 (指定機構+民調)</h3>"
+    if general_news:
+        html_content += "<ul>"
+        for news in general_news:
+            html_content += f"<li><a href='{news['link']}'>{news['title']}</a><br><small>{news['published']}</small></li>"
+        html_content += "</ul>"
+    else:
+        html_content += "<p style='color: gray;'>（過去 24 小時內，指定機構無相關民調發表）</p>"
+
+    html_content += "<h3>🇹🇼🇨🇳 兩岸關係特定機構民調動態 (限國防院/聯合/TVBS + 兩岸 + 民調)</h3>"
+    if cross_strait_news:
+        html_content += "<ul>"
+        for news in cross_strait_news:
+            html_content += f"<li><a href='{news['link']}'>{news['title']}</a><br><small>{news['published']}</small></li>"
+        html_content += "</ul>"
+    else:
+        html_content += "<p style='color: gray;'>（過去 24 小時內，國防院/聯合/TVBS 無相關兩岸民調發表）</p>"
+
+    send_email(html_content)
 
 if __name__ == "__main__":
     main()
