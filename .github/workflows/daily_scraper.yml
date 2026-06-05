@@ -3,7 +3,7 @@ name: Daily Poll News Scraper
 on:
   schedule:
     - cron: '0 23 * * *'
-  workflow_dispatch:
+workflow_dispatch: #
 
 jobs:
   run-scraper:
