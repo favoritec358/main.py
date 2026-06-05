@@ -21,30 +21,30 @@ cross_strait_orgs = [
     "國防安全研究院", "聯合報", "TVBS"
 ]
 
-def is_within_24_hours(entry):
-    """【時間鐵閘】嚴格檢查新聞發布時間是否在 24 小時之內"""
+def is_within_48_hours(entry):
+    """【時間鐵閘】嚴格檢查新聞發布時間是否在 48 小時之內"""
     try:
         # Google News RSS 的時間格式通常為：Fri, 05 Jun 2026 06:17:00 GMT
         # 轉換為帶有 UTC 時區的 datetime 物件
         pub_time = datetime.strptime(entry.published, "%a, %d %b %Y %H:%M:%S %Z").replace(tzinfo=timezone.utc)
         now_time = datetime.now(timezone.utc)
         
-        # 判斷差距是否小於 24 小時
-        return (now_time - pub_time) <= timedelta(hours=24)
+        # 判斷差距是否小於 48 小時
+        return (now_time - pub_time) <= timedelta(hours=48)
     except Exception as e:
         # 如果時間解析失敗，保守起見允許放行，但記錄錯誤
         print(f"時間解析異常: {e}")
         return True
 
 def fetch_and_filter_general(query, org_list):
-    """抓取一般機構，並限制【標題含機構+民調】且【必須是24小時內】"""
+    """抓取一般機構，並限制【標題含機構+民調】且【必須是48小時內】"""
     url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query + ' when:1d')}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
     feed = feedparser.parse(url)
     results = []
     
     for entry in feed.entries:
-        # 1. 第一道鐵閘：時間必須在 24 小時內，否則直接淘汰
-        if not is_within_24_hours(entry):
+        # 1. 第一道鐵閘：時間必須在 48 小時內，否則直接淘汰
+        if not is_within_48_hours(entry):
             continue
             
         title_lower = entry.title.lower()
@@ -61,14 +61,14 @@ def fetch_and_filter_general(query, org_list):
     return results
 
 def fetch_and_filter_cross_strait(query, org_list):
-    """抓取特定機構，並限制【標題含機構+兩岸+民調】且【必須是24小時內】"""
+    """抓取特定機構，並限制【標題含機構+兩岸+民調】且【必須是48小時內】"""
     url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query + ' when:1d')}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
     feed = feedparser.parse(url)
     results = []
     
     for entry in feed.entries:
-        # 1. 第一道鐵閘：時間必須在 24 小時內，否則直接淘汰
-        if not is_within_24_hours(entry):
+        # 1. 第一道鐵閘：時間必須在 48 小時內，否則直接淘汰
+        if not is_within_48_hours(entry):
             continue
             
         title_lower = entry.title.lower()
@@ -132,25 +132,25 @@ def main():
 
     # 組裝 HTML 報告
     html_content = f"<h2>📊 每日民調與兩岸關係精確追蹤報告</h2>"
-    html_content += f"<p>報告時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (已啟動24小時內時間鐵閘)</p><hr>"
+    html_content += f"<p>報告時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (已啟動48小時內時間鐵閘)</p><hr>"
     
-    html_content += "<h3>🌐 國際與國內機構民調動態 (24小時內 + 標題必含機構+民調)</h3>"
+    html_content += "<h3>🌐 國際與國內機構民調動態 (48小時內 + 標題必含機構+民調)</h3>"
     if general_news:
         html_content += "<ul>"
         for news in general_news:
             html_content += f"<li><a href='{news['link']}'>{news['title']}</a><br><small>{news['published']}</small></li>"
         html_content += "</ul>"
     else:
-        html_content += "<p style='color: gray;'>（過去 24 小時內，無符合標準的最新民調發表）</p>"
+        html_content += "<p style='color: gray;'>（過去 48 小時內，無符合標準的最新民調發表）</p>"
 
-    html_content += "<h3>🇹🇼🇨🇳 兩岸關係特定機構民調動態 (24小時內 + 標題必含該機構+兩岸+民調)</h3>"
+    html_content += "<h3>🇹🇼🇨🇳 兩岸關係特定機構民調動態 (48小時內 + 標題必含該機構+兩岸+民調)</h3>"
     if cross_strait_news:
         html_content += "<ul>"
         for news in cross_strait_news:
             html_content += f"<li><a href='{news['link']}'>{news['title']}</a><br><small>{news['published']}</small></li>"
         html_content += "</ul>"
     else:
-        html_content += "<p style='color: gray;'>（過去 24 小時內，無符合標準的最新兩岸民調發表）</p>"
+        html_content += "<p style='color: gray;'>（過去 48 小時內，無符合標準的最新兩岸民調發表）</p>"
 
     send_email(html_content)
 
