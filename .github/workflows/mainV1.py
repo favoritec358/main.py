@@ -23,7 +23,7 @@ cross_strait_orgs = [
 
 # 3. 兩岸交流論壇清單 (新增)
 forum_keywords = [
-    "雙城論壇", "雙城", "兩湖論壇"
+    "雙城論壇", "兩湖論壇"
 ]
 
 def is_within_48_hours(entry):
