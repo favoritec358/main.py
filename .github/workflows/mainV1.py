@@ -7,92 +7,41 @@ import os
 from datetime import datetime, timedelta, timezone
 
 # 目標收件人
-RECEIVER_EMAILS = ["favoritec358@gmail.com", "jimmychwchang@gmail.com"]
+RECEIVER_EMAILS = ["favoritec358@gmail.com", "yunsing1224@gmail.com"]
 
-# 1. 一般民調機構清單
-general_orgs = [
-    "美麗島電子報", "國政民調", "民主文教基金會", "皮尤", "Pew Research Center",
-    "雷根總統基金會", "Ronald Reagan Presidential Foundation", "Lowy Institute",
-    "Chicago Council on Global Affairs", "YouGov", "Angus Reid Institute"
+# 🎯 1. 調整後的常規文化與媒體關鍵字清單
+CULTURE_MEDIA_KEYWORDS = [
+    "陸劇", "陸片", "陸媒", "陸書", "小紅書", 
+    "抖音", "TikTok", "愛奇藝", 
+    "微博", "官媒", "駐點記者", "中國台灣"
 ]
 
-# 2. 特定議題機構清單
-cross_strait_orgs = [
-    "國防安全研究院", "聯合報", "TVBS"
-]
+# 🎯 2. 修改：藝人/網紅 政治立場篩選條件
+ARTIST_KEYWORD = ["藝人", "網紅"]
+ARTIST_POLITICAL_TRIGGERS = ["舔共", "統戰", "武統", "祖國"]
 
-# 3. 兩岸交流論壇清單 (新增)
-forum_keywords = [
-    "雙城論壇", "兩湖論壇"
-]
-
-def is_within_48_hours(entry):
-    """【時間鐵閘】嚴格檢查新聞發布時間是否在 48 小時之內"""
+def is_within_12_hours(entry):
+    """【時間鐵閘】嚴格檢查新聞發布時間是否在 12 小時之內"""
     try:
         pub_time = datetime.strptime(entry.published, "%a, %d %b %Y %H:%M:%S %Z").replace(tzinfo=timezone.utc)
         now_time = datetime.now(timezone.utc)
-        return (now_time - pub_time) <= timedelta(hours=48)
+        return (now_time - pub_time) <= timedelta(hours=12)
     except Exception as e:
         print(f"時間解析異常: {e}")
         return True
 
-def fetch_and_filter_general(query, org_list):
-    """抓取一般機構，並限制【標題含機構+民調】且【必須是48小時內】"""
-    url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query + ' when:1d')}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
+def fetch_and_filter_culture_media(query, keyword_list):
+    """抓取文化新媒體動態，並限制【標題必含清單關鍵字】且【必須是12小時內】"""
+    # 參數改為 when:12h，直接請 Google 先濾掉太舊的新聞
+    url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query + ' when:12h')}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
     feed = feedparser.parse(url)
     results = []
     
     for entry in feed.entries:
-        if not is_within_48_hours(entry):
+        if not is_within_12_hours(entry):
             continue
             
         title_lower = entry.title.lower()
-        has_org = any(org.lower() in title_lower for org in org_list)
-        has_poll = "民調" in title_lower or "poll" in title_lower
-        
-        if has_org and has_poll:
-            results.append({
-                "title": entry.title,
-                "link": entry.link,
-                "published": entry.published
-            })
-    return results
-
-def fetch_and_filter_cross_strait(query, org_list):
-    """抓取特定機構，並限制【標題含機構+兩岸+民調】且【必須是48小時內】"""
-    url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query + ' when:1d')}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
-    feed = feedparser.parse(url)
-    results = []
-    
-    for entry in feed.entries:
-        if not is_within_48_hours(entry):
-            continue
-            
-        title_lower = entry.title.lower()
-        has_org = any(org.lower() in title_lower for org in org_list)
-        has_cross = "兩岸" in title_lower or "兩岸關係" in title_lower
-        has_poll = "民調" in title_lower or "poll" in title_lower
-        
-        if has_org and has_cross and has_poll:
-            results.append({
-                "title": entry.title,
-                "link": entry.link,
-                "published": entry.published
-            })
-    return results
-
-def fetch_and_filter_forums(query, keyword_list):
-    """抓取交流論壇，並限制【標題含論壇關鍵字】且【必須是48小時內】"""
-    url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query + ' when:1d')}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
-    feed = feedparser.parse(url)
-    results = []
-    
-    for entry in feed.entries:
-        if not is_within_48_hours(entry):
-            continue
-            
-        title_lower = entry.title.lower()
-        # 只要標題包含我們關注的論壇關鍵字即可
         has_keyword = any(keyword.lower() in title_lower for keyword in keyword_list)
         
         if has_keyword:
@@ -103,19 +52,42 @@ def fetch_and_filter_forums(query, keyword_list):
             })
     return results
 
-def build_queries():
-    """建構原始搜尋字串"""
-    general_orgs_str = " OR ".join(f'"{org}"' for org in general_orgs)
-    query_general = f"({general_orgs_str}) AND (民調 OR Poll)"
+def fetch_and_filter_artist_politics(query):
+    """抓取藝人政治動態，限制【標題必含(藝人/網紅) + (舔共/統戰/武統/祖國)】且【必須是12小時內】"""
+    # 參數改為 when:12h
+    url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query + ' when:12h')}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
+    feed = feedparser.parse(url)
+    results = []
+    
+    for entry in feed.entries:
+        if not is_within_12_hours(entry):
+            continue
+            
+        title_lower = entry.title.lower()
+        # 核心邏輯：標題必須有「藝人」或「網紅」，且同時包含（舔共、統戰、武統、祖國）其中之一
+        has_artist = any(kw.lower() in title_lower for kw in ARTIST_KEYWORD)
+        has_trigger = any(trigger.lower() in title_lower for trigger in ARTIST_POLITICAL_TRIGGERS)
+        
+        if has_artist and has_trigger:
+            results.append({
+                "title": entry.title,
+                "link": entry.link,
+                "published": entry.published
+            })
+    return results
 
-    cross_strait_orgs_str = " OR ".join(f'"{org}"' for org in cross_strait_orgs)
-    query_cross_strait = f"({cross_strait_orgs_str}) AND (兩岸關係 OR 兩岸) AND (民調 OR Poll)"
+def build_queries():
+    """建構兩種不同的搜尋字串"""
+    # 1. 常規文化媒體
+    keywords_str = " OR ".join(f'"{kw}"' for kw in CULTURE_MEDIA_KEYWORDS)
+    query_culture_media = f"({keywords_str})"
     
-    # 新增論壇搜尋字串
-    forums_str = " OR ".join(f'"{kw}"' for kw in forum_keywords)
-    query_forums = f"({forums_str})"
+    # 2. 藝人/網紅特種政治動態： ("藝人" OR "網紅") AND ("舔共" OR "統戰" OR "武統" OR "祖國")
+    artist_str = " OR ".join(f'"{kw}"' for kw in ARTIST_KEYWORD)
+    triggers_str = " OR ".join(f'"{tg}"' for tg in ARTIST_POLITICAL_TRIGGERS)
+    query_artist_politics = f'({artist_str}) AND ({triggers_str})'
     
-    return query_general, query_cross_strait, query_forums
+    return query_culture_media, query_artist_politics
 
 def send_email(html_content):
     """發送 Email 給所有人 (100% 符合 RFC 5321 安全規格版)"""
@@ -132,17 +104,15 @@ def send_email(html_content):
         server.starttls()
         server.login(sender_email, sender_password)
         
-        # 🎯 核心修正：對每個收件人「單獨」打包成合法的獨立信件發送
         for receiver in RECEIVER_EMAILS:
             msg = MIMEMultipart("alternative")
-            msg["Subject"] = f"📊 每日民調與兩岸關係精選追蹤 ({datetime.now().strftime('%Y-%m-%d')})"
+            msg["Subject"] = f"📱 每日阿共文化與藝人政治動態追蹤 ({datetime.now().strftime('%Y-%m-%d')})"
             msg["From"] = sender_email
-            msg["To"] = receiver  # 這邊傳入單一字串，絕對符合 RFC 5321 規範！
+            msg["To"] = receiver  
 
             part = MIMEText(html_content, "html", "utf-8")
             msg.attach(part)
             
-            # 單獨發送給該收件人
             server.sendmail(sender_email, [receiver], msg.as_string())
             print(f"✅ 信件已成功遞交給收件人: {receiver}")
             
@@ -152,43 +122,36 @@ def send_email(html_content):
         print(f"❌ [最終回報] 郵件發送流程發生異常: {e}")
 
 def main():
-    print("下人開始實施【時間重重過濾】防噪聲追蹤...")
-    query_general, query_cross_strait, query_forums = build_queries()
+    print("下人開始實施【常規文化 + 藝人網紅政治鐵閘】重重過濾追蹤...")
+    query_culture, query_artist = build_queries()
     
-    general_news = fetch_and_filter_general(query_general, general_orgs)
-    cross_strait_news = fetch_and_filter_cross_strait(query_cross_strait, cross_strait_orgs)
-    forum_news = fetch_and_filter_forums(query_forums, forum_keywords) # 執行論壇抓取
+    # 執行兩條戰線的定向抓取
+    culture_news = fetch_and_filter_culture_media(query_culture, CULTURE_MEDIA_KEYWORDS)
+    artist_news = fetch_and_filter_artist_politics(query_artist)
 
-    html_content = f"<h2>📊 每日民調、兩岸關係與論壇精確追蹤報告</h2>"
-    html_content += f"<p>報告時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (已啟動48小時內時間鐵閘)</p><hr>"
+    # 建立全新的 HTML 報告
+    html_content = f"<h2>📱 每日阿共文化與新媒體輿論精確追蹤報告</h2>"
+    html_content += f"<p>報告時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (已啟動12小時內時間鐵閘)</p><hr>"
     
-    html_content += "<h3>🌐 國際與國內機構民調動態 (48小時內 + 標題必含機構+民調)</h3>"
-    if general_news:
+    # 區塊一：常規新媒體
+    html_content += "<h3>🎬 影視、新媒體平台與輿論動態 (標題必含：陸劇/小紅書/TikTok/官媒等)</h3>"
+    if culture_news:
         html_content += "<ul>"
-        for news in general_news:
+        for news in culture_news:
             html_content += f"<li><a href='{news['link']}'>{news['title']}</a><br><small>{news['published']}</small></li>"
         html_content += "</ul>"
     else:
-        html_content += "<p style='color: gray;'>（過去 48 小時內，無符合標準的最新民調發表）</p>"
+        html_content += "<p style='color: gray;'>（過去 12 小時內，無符合標準的最新媒體動態）</p>"
 
-    html_content += "<h3>🇹🇼🇨🇳 兩岸關係特定機構民調動態 (48小時內 + 標題必含該機構+兩岸+民調)</h3>"
-    if cross_strait_news:
+    # 區塊二：獨立出來的藝人網紅政治動態
+    html_content += "<h3>⚠️ 藝人/網紅政治表態特種追蹤 (標題必含：藝人/網紅 + 舔共/統戰/武統/祖國)</h3>"
+    if artist_news:
         html_content += "<ul>"
-        for news in cross_strait_news:
-            html_content += f"<li><a href='{news['link']}'>{news['title']}</a><br><small>{news['published']}</small></li>"
+        for news in artist_news:
+            html_content += f"<li><a href='{news['link']}' style='color: #CD5C5C; font-weight: bold;'>{news['title']}</a><br><small>{news['published']}</small></li>"
         html_content += "</ul>"
     else:
-        html_content += "<p style='color: gray;'>（過去 48 小時內，無符合標準的最新兩岸民調發表）</p>"
-
-    # 新增論壇動態的 HTML 區塊
-    html_content += "<h3>🤝 兩岸交流論壇動態 (48小時內 + 標題必含 雙城論壇 或 兩湖論壇)</h3>"
-    if forum_news:
-        html_content += "<ul>"
-        for news in forum_news:
-            html_content += f"<li><a href='{news['link']}'>{news['title']}</a><br><small>{news['published']}</small></li>"
-        html_content += "</ul>"
-    else:
-        html_content += "<p style='color: gray;'>（過去 48 小時內，無符合標準的最新論壇動態）</p>"
+        html_content += "<p style='color: gray;'>（過去 12 小時內，無偵測到符合標準的藝人或網紅政治表態新聞）</p>"
 
     send_email(html_content)
 
