@@ -18,7 +18,7 @@ general_orgs = [
 
 # 2. 特定議題機構清單
 cross_strait_orgs = [
-    "國防安全研究院", "聯合報", "TVBS"
+    "國防安全研究院", "國防院", "聯合報", "TVBS"
 ]
 
 # 3. 兩岸交流論壇清單 (新增)
@@ -26,24 +26,24 @@ forum_keywords = [
     "雙城論壇", "兩湖論壇"
 ]
 
-def is_within_12_hours(entry):
-    """【時間鐵閘】嚴格檢查新聞發布時間是否在 12 小時之內"""
+def is_within_24_hours(entry):
+    """【時間鐵閘】嚴格檢查新聞發布時間是否在 24 小時之內"""
     try:
         pub_time = datetime.strptime(entry.published, "%a, %d %b %Y %H:%M:%S %Z").replace(tzinfo=timezone.utc)
         now_time = datetime.now(timezone.utc)
-        return (now_time - pub_time) <= timedelta(hours=12)
+        return (now_time - pub_time) <= timedelta(hours=24)
     except Exception as e:
         print(f"時間解析異常: {e}")
         return True
 
 def fetch_and_filter_general(query, org_list):
-    """抓取一般機構，並限制【標題含機構+民調】且【必須是12小時內】"""
+    """抓取一般機構，並限制【標題含機構+民調】且【必須是24小時內】"""
     url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query + ' when:1d')}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
     feed = feedparser.parse(url)
     results = []
 
     for entry in feed.entries:
-        if not is_within_12_hours(entry):
+        if not is_within_24_hours(entry):
             continue
 
         title_lower = entry.title.lower()
@@ -59,13 +59,13 @@ def fetch_and_filter_general(query, org_list):
     return results
 
 def fetch_and_filter_cross_strait(query, org_list):
-    """抓取特定機構，並限制【標題含機構+兩岸+民調】且【必須是12小時內】"""
+    """抓取特定機構，並限制【標題含機構+兩岸+民調】且【必須是24小時內】"""
     url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query + ' when:1d')}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
     feed = feedparser.parse(url)
     results = []
 
     for entry in feed.entries:
-        if not is_within_12_hours(entry):
+        if not is_within_24_hours(entry):
             continue
 
         title_lower = entry.title.lower()
@@ -82,13 +82,13 @@ def fetch_and_filter_cross_strait(query, org_list):
     return results
 
 def fetch_and_filter_forums(query, keyword_list):
-    """抓取交流論壇，並限制【標題含論壇關鍵字】且【必須是12小時內】"""
+    """抓取交流論壇，並限制【標題含論壇關鍵字】且【必須是24小時內】"""
     url = f"https://news.google.com/rss/search?q={urllib.parse.quote(query + ' when:1d')}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
     feed = feedparser.parse(url)
     results = []
 
     for entry in feed.entries:
-        if not is_within_12_hours(entry):
+        if not is_within_24_hours(entry):
             continue
 
         title_lower = entry.title.lower()
@@ -152,7 +152,7 @@ def send_email(html_content):
         print(f"❌ [最終回報] 郵件發送流程發生異常: {e}")
 
 def main():
-    print("下人開始實施【12小時時間重重過濾】防噪聲追蹤...")
+    print("下人開始實施【24小時時間重重過濾】防噪聲追蹤...")
     query_general, query_cross_strait, query_forums = build_queries()
 
     general_news = fetch_and_filter_general(query_general, general_orgs)
@@ -160,35 +160,35 @@ def main():
     forum_news = fetch_and_filter_forums(query_forums, forum_keywords) # 執行論壇抓取
 
     html_content = f"<h2>📊 每日民調、兩岸關係與論壇精確追蹤報告</h2>"
-    html_content += f"<p>報告時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (已啟動12小時內時間鐵閘)</p><hr>"
+    html_content += f"<p>報告時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (已啟動24小時內時間鐵閘)</p><hr>"
 
-    html_content += "<h3>🌐 國際與國內機構民調動態 (12小時內 + 標題必含機構+民調)</h3>"
+    html_content += "<h3>🌐 國際與國內機構民調動態 (24小時內 + 標題必含機構+民調)</h3>"
     if general_news:
         html_content += "<ul>"
         for news in general_news:
             html_content += f"<li><a href='{news['link']}'>{news['title']}</a><br><small>{news['published']}</small></li>"
         html_content += "</ul>"
     else:
-        html_content += "<p style='color: gray;'>（過去 12 小時內，無符合標準的最新民調發表）</p>"
+        html_content += "<p style='color: gray;'>（過去 24 小時內，無符合標準的最新民調發表）</p>"
 
-    html_content += "<h3>🇹🇼🇨🇳 兩岸關係特定機構民調動態 (12小時內 + 標題必含該機構+兩岸+民調)</h3>"
+    html_content += "<h3>🇹🇼🇨🇳 兩岸關係特定機構民調動態 (24小時內 + 標題必含該機構+兩岸+民調)</h3>"
     if cross_strait_news:
         html_content += "<ul>"
         for news in cross_strait_news:
             html_content += f"<li><a href='{news['link']}'>{news['title']}</a><br><small>{news['published']}</small></li>"
         html_content += "</ul>"
     else:
-        html_content += "<p style='color: gray;'>（過去 12 小時內，無符合標準的最新兩岸民調發表）</p>"
+        html_content += "<p style='color: gray;'>（過去 24 小時內，無符合標準的最新兩岸民調發表）</p>"
 
     # 新增論壇動態的 HTML 區塊
-    html_content += "<h3>🤝 兩岸交流論壇動態 (12小時內 + 標題必含 雙城論壇 或 兩湖論壇)</h3>"
+    html_content += "<h3>🤝 兩岸交流論壇動態 (24小時內 + 標題必含 雙城論壇 或 兩湖論壇)</h3>"
     if forum_news:
         html_content += "<ul>"
         for news in forum_news:
             html_content += f"<li><a href='{news['link']}'>{news['title']}</a><br><small>{news['published']}</small></li>"
         html_content += "</ul>"
     else:
-        html_content += "<p style='color: gray;'>（過去 12 小時內，無符合標準的最新論壇動態）</p>"
+        html_content += "<p style='color: gray;'>（過去 24 小時內，無符合標準的最新論壇動態）</p>"
 
     send_email(html_content)
 
