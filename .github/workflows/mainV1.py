@@ -12,7 +12,7 @@ RECEIVER_EMAILS = ["favoritec358@gmail.com", "jimmychwchang@gmail.com"]
 # 1. 一般民調機構清單
 general_orgs = [
     "美麗島電子報", "國政民調", "民主文教基金會", "皮尤", "Pew Research Center",
-    "雷根總統基金會暨紀念中心" ,"雷根總統基金會", "雷根基金會", "Ronald Reagan Presidential Foundation", "Lowy Institute",
+    "雷根總統基金會暨紀念中心", "雷根總統基金會", "雷根基金會", "Ronald Reagan Presidential Foundation", "Lowy Institute",
     "Chicago Council on Global Affairs", "YouGov", "Angus Reid Institute"
 ]
 
